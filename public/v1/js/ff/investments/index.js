@@ -24,4 +24,13 @@ $(function () {
     // current allocation, by account and by broker.
     drawAChart(investmentsAllocationAccountUrl, 'investments-allocation-account', 'pie', pieOptions, false);
     drawAChart(investmentsAllocationBrokerUrl, 'investments-allocation-broker', 'pie', $.extend(true, {}, pieOptions), false);
+
+    // value of each product, one chart per depot. Lines connect across the days without a price.
+    // each chart gets a fixed height instead of following the width.
+    $('canvas.investments-products-chart').each(function () {
+        var options = $.extend(true, {}, lineOptions, {spanGaps: true, maintainAspectRatio: false});
+        this.parentNode.style.position = 'relative';
+        this.parentNode.style.height = '300px';
+        drawAChart($(this).data('url'), this.id, 'line', options, true);
+    });
 });

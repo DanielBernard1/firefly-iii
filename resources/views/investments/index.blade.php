@@ -112,6 +112,123 @@ shares: 12.5</pre>
             </div>
         </div>
 
+        {{-- products per depot --}}
+        <div class="row">
+            <div class="col-lg-12 mb-2 d-flex flex-wrap gap-2 align-items-center">
+                <form method="POST" action="{{ route('investments.update') }}" class="d-inline">
+                    <input name="_token" type="hidden" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-primary" id="investments-update"><em class="bi bi-arrow-repeat"></em> {{ trans('investments.update_now') }}</button>
+                </form>
+                <a href="{{ route('investments.products.create') }}" class="btn btn-secondary"><em class="bi bi-plus-circle"></em> {{ trans('investments.add_product') }}</a>
+                <small class="text-muted">{{ trans('investments.update_explained') }}</small>
+            </div>
+        </div>
+        @foreach($depots as $depotId => $depot)
+            @php($depotCurrency = $overview['rows'][$depotId]['currency'])
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card mb-2 investments-depot" id="investments-depot-{{ $depotId }}">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h3 class="card-title mb-0">
+                                {{ $depot['account']->name }}
+                                @if(null !== ($overview['rows'][$depotId]['broker'] ?? null))
+                                    <small class="text-muted">({{ $overview['rows'][$depotId]['broker'] }})</small>
+                                @endif
+                            </h3>
+                            <a href="{{ route('investments.products.create', ['account' => $depotId]) }}" class="btn btn-sm btn-secondary ms-auto"><em class="bi bi-plus"></em> {{ trans('investments.add_product') }}</a>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                            <table class="table table-hover table-sm mb-0 investments-products">
+                                <thead>
+                                <tr>
+                                    <th>{{ trans('investments.product') }}</th>
+                                    <th class="text-end">{{ trans('investments.shares') }}</th>
+                                    <th class="text-end">{{ trans('investments.price') }}</th>
+                                    <th class="text-end">{{ trans('investments.value') }}</th>
+                                    <th class="text-end">{{ trans('investments.invested') }}</th>
+                                    <th class="text-end">{{ trans('investments.gain') }}</th>
+                                    <th class="text-end">{{ trans('investments.change_last') }}</th>
+                                    <th class="text-end">{{ trans('investments.change_since', ['days' => 30]) }}</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                @foreach($depot['products'] as $row)
+                                    <tr>
+                                        <td>
+                                            {{ $row['product']->name }}
+                                            <br><small class="text-muted font-monospace">{{ $row['product']->isin }}@if(null !== $row['product']->isin && null !== $row['product']->symbol) · @endif{{ $row['product']->symbol }}</small>
+                                        </td>
+                                        <td class="text-end">{{ InvestmentFormatter::number($row['product']->shares) }}</td>
+                                        <td class="text-end">
+                                            @if(null === $row['price'])
+                                                <span class="text-muted" title="{{ trans('investments.no_price_yet') }}">–</span>
+                                            @else
+                                                {!! format_amount_by_symbol(\FireflyIII\Support\Facades\Steam::bcround($row['price'], 4), $depotCurrency->symbol, 4, false) !!}
+                                                <br><small class="text-muted">{{ $row['price_date']->isoFormat($monthAndDayFormat) }}@if('manual' === $row['price_source']) · {{ trans('investments.manual') }}@endif</small>
+                                            @endif
+                                        </td>
+                                        <td class="text-end">@if(null !== $row['value']){!! format_amount_by_symbol($row['value'], $depotCurrency->symbol, $depotCurrency->decimal_places) !!}@else – @endif</td>
+                                        <td class="text-end">{!! format_amount_by_symbol($row['invested'], $depotCurrency->symbol, $depotCurrency->decimal_places, false) !!}</td>
+                                        <td class="text-end">
+                                            @if(null !== $row['gain'])
+                                                {!! format_amount_by_symbol($row['gain'], $depotCurrency->symbol, $depotCurrency->decimal_places) !!}
+                                                <br><small class="text-muted">{{ InvestmentFormatter::percentage($row['gain_pct'], true) }}</small>
+                                            @else – @endif
+                                        </td>
+                                        <td class="text-end">
+                                            @if(null !== $row['change'])
+                                                {!! format_amount_by_symbol($row['change'], $depotCurrency->symbol, $depotCurrency->decimal_places) !!}
+                                                <br><small class="text-muted">{{ InvestmentFormatter::percentage($row['change_pct'], true) }}</small>
+                                            @else – @endif
+                                        </td>
+                                        <td class="text-end">
+                                            @if(null !== $row['change_30'])
+                                                {!! format_amount_by_symbol($row['change_30'], $depotCurrency->symbol, $depotCurrency->decimal_places) !!}
+                                                <br><small class="text-muted">{{ InvestmentFormatter::percentage($row['change_30_pct'], true) }}</small>
+                                            @else – @endif
+                                        </td>
+                                        <td class="text-end">
+                                            <a href="{{ route('investments.products.edit', [$row['product']->id]) }}" class="btn btn-sm btn-secondary" title="{{ trans('investments.edit_product') }}"><em class="bi bi-pencil"></em></a>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                                </tbody>
+                                <tfoot>
+                                <tr class="fw-bold">
+                                    <td colspan="3">{{ trans('investments.total') }}</td>
+                                    <td class="text-end">{!! format_amount_by_symbol($depot['total']['value'], $depotCurrency->symbol, $depotCurrency->decimal_places) !!}</td>
+                                    <td class="text-end">{!! format_amount_by_symbol($depot['total']['invested'], $depotCurrency->symbol, $depotCurrency->decimal_places, false) !!}</td>
+                                    <td class="text-end">
+                                        {!! format_amount_by_symbol($depot['total']['gain'], $depotCurrency->symbol, $depotCurrency->decimal_places) !!}
+                                        <br><small class="text-muted">{{ InvestmentFormatter::percentage($depot['total']['gain_pct'], true) }}</small>
+                                    </td>
+                                    <td class="text-end">
+                                        {!! format_amount_by_symbol($depot['total']['change'], $depotCurrency->symbol, $depotCurrency->decimal_places) !!}
+                                        <br><small class="text-muted">{{ InvestmentFormatter::percentage($depot['total']['change_pct'], true) }}</small>
+                                    </td>
+                                    <td class="text-end">
+                                        {!! format_amount_by_symbol($depot['total']['change_30'], $depotCurrency->symbol, $depotCurrency->decimal_places) !!}
+                                        <br><small class="text-muted">{{ InvestmentFormatter::percentage($depot['total']['change_30_pct'], true) }}</small>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                            </div>
+                            <div class="p-3">
+                                <h4 class="h6">{{ trans('investments.product_chart', ['start' => $start->isoFormat($monthAndDayFormat), 'end' => $end->isoFormat($monthAndDayFormat)]) }}</h4>
+                                <div>
+                                    <canvas id="investments-products-chart-{{ $depotId }}" class="investments-products-chart" data-url="{{ route('investments.chart.products', [$depotId]) }}"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endforeach
+
         <div class="row">
             <div class="col-lg-12">
                 <div class="card mb-2">

@@ -17,12 +17,13 @@ namespace FireflyIII\Http\Controllers\Investments;
 
 use FireflyIII\Http\Controllers\Controller;
 use FireflyIII\Support\Investments\InvestmentOverview;
+use FireflyIII\Support\Investments\InvestmentPortfolio;
 use FireflyIII\User;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 
 /**
- * Shows the "Investments" page. Read-only: it never changes any data.
+ * Shows the "Investments" page. Showing it never changes any data.
  */
 final class IndexController extends Controller
 {
@@ -42,12 +43,15 @@ final class IndexController extends Controller
     {
         /** @var User $user */
         $user     = auth()->user();
-        $overview = new InvestmentOverview($user)->getOverview(today(config('app.timezone')));
+        $today    = today(config('app.timezone'));
+        $overview = new InvestmentOverview($user)->getOverview($today);
+        $accounts = array_map(static fn (array $row) => $row['account'], $overview['rows']);
+        $depots   = new InvestmentPortfolio($user)->getDepots($accounts, $today);
 
         // the date range for the balance chart is the range selected at the top of the page, like elsewhere in Firefly III.
         $start    = clone session('start', today(config('app.timezone'))->startOfMonth());
         $end      = clone session('end', today(config('app.timezone'))->endOfMonth());
 
-        return view('investments.index', ['overview' => $overview, 'start' => $start, 'end' => $end]);
+        return view('investments.index', ['overview' => $overview, 'depots' => $depots, 'start' => $start, 'end' => $end]);
     }
 }

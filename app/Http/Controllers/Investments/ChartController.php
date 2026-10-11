@@ -15,12 +15,15 @@ declare(strict_types=1);
 
 namespace FireflyIII\Http\Controllers\Investments;
 
+use Carbon\Carbon;
 use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Generator\Chart\Basic\GeneratorInterface;
 use FireflyIII\Http\Controllers\Controller;
 use FireflyIII\Support\Http\Controllers\ChartGeneration;
 use FireflyIII\Support\Investments\InvestmentCalculator;
 use FireflyIII\Support\Investments\InvestmentOverview;
+use FireflyIII\Support\Investments\InvestmentPortfolio;
+use FireflyIII\Support\Investments\Models\InvestmentProduct;
 use FireflyIII\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
@@ -67,6 +70,33 @@ final class ChartController extends Controller
     public function allocationByBroker(): JsonResponse
     {
         return response()->json($this->allocation('broker', (string) trans('investments.no_broker')));
+    }
+
+    /**
+     * Value of each product in one depot over time, for the date range selected at the top of the page.
+     */
+    public function productValues(int $accountId): JsonResponse
+    {
+        /** @var User $user */
+        $user     = auth()->user();
+        $products = InvestmentProduct::query()->where('user_id', $user->id)->where('account_id', $accountId)->orderBy('name')->get();
+        if (0 === $products->count()) {
+            return response()->json([]);
+        }
+        $start    = clone session('start', today(config('app.timezone'))->startOfMonth());
+        $end      = clone session('end', today(config('app.timezone'))->endOfMonth());
+        $history  = InvestmentPortfolio::valueHistory($products, $start, $end);
+        if (0 === count($history['labels'])) {
+            return response()->json([]);
+        }
+        $symbol   = $this->overview()->getAccountCurrency($products->first()->account)->symbol;
+        $sets     = [];
+        foreach ($history['sets'] as $set) {
+            $sets[] = ['label' => $set['label'], 'type' => 'line', 'fill' => false, 'currency_symbol' => $symbol, 'entries' => $set['entries']];
+        }
+        $labels   = array_map(static fn (string $date): string => Carbon::parse($date)->isoFormat((string) trans('config.month_and_day_js')), $history['labels']);
+
+        return response()->json(app(GeneratorInterface::class)->multiSet($sets, $labels));
     }
 
     private function allocation(string $field, string $emptyLabel): array

@@ -8,25 +8,92 @@ image (`fireflyiii/core:version-6.7.7`) plus the files of the "Investments" page
 - `apply-changes.sh` – runs while the image is built and makes the two one-line edits to existing
   Firefly III files (the route and the menu entry). It stops the build with an error if it can't.
 
-## How to use the page
+The image also adds two database tables (products and prices). Firefly III creates them by itself
+when the container starts, like during any update. **Make a backup of your database first.**
 
-Edit an asset account in Firefly III and put these lines in its **notes**:
+## How it works
+
+| What | Where it lives | Effect on your normal finances |
+|---|---|---|
+| Money you move to a broker, buys and sells | Normal Firefly III **transfers** between your own accounts | None. A transfer between your own accounts is neither income nor an expense. |
+| Your products (name, ISIN, shares, amount paid) | Table `investment_products`, edited on the Investments page | None |
+| Price history | Table `investment_prices`, filled by the price update | None |
+| Changes in market value | Automatic **transfers** between the depot and the account **"Investment value changes"** | None for income, expenses and budgets. Net worth includes the market value of your depots. |
+
+"Investment value changes" is an asset account that the price update creates by itself. It has
+**"Include in net worth" switched off** and collects the opposite side of every value change (its
+balance is minus your total gains). Don't use it for anything else. The transfers it makes have the
+tag `investment-value-change` and list shares and prices in their notes.
+
+## Setting up your accounts
+
+Example with a Scalable depot, the Scalable cash balance and a Sparkasse depot:
+
+| Account (asset account) | Notes | Products on the Investments page |
+|---|---|---|
+| Scalable Balance | `investment: true` and `broker: Scalable Capital` | none: shown as cash |
+| Scalable Depot | `investment: true` and `broker: Scalable Capital` | e.g. MSCI World, MSCI EM, Apple |
+| Sparkasse Depot | `investment: true` and `broker: Sparkasse` | e.g. a Deka fund |
+
+1. Create the three asset accounts (role "Savings account" is a good choice) and put the lines above
+   in their **notes**. Only `investment: true` is required. Upper/lower case, extra spaces, `=`
+   instead of `:`, Markdown `- ` and `**bold**` are all fine.
+2. Enter what you have paid in so far as **transfers**, for example Girokonto → Scalable Balance and
+   Scalable Balance → Scalable Depot.
+3. On the **Investments** page, click **Add product** for every product in a depot: name, ISIN,
+   number of shares and the amount you paid for them. The Yahoo Finance symbol is optional: when
+   it is empty, it is looked up from the ISIN (German exchanges first, so prices are in euro).
+4. Click **Update prices now**. Each depot's balance then becomes its market value.
+5. Set up the automatic update (below).
+
+### When you buy or sell
+
+1. Enter the money as a **transfer** (buy: Scalable Balance → Scalable Depot; sell: the other way).
+2. On the Investments page, click the pencil next to the product and change **shares** and
+   **amount paid**. A savings plan means doing this now and then; the numbers only need to be right
+   at the next price update.
+
+If you forget step 2, the next update books the difference as a value change (for example a buy
+of €100 as a €100 loss). Fix the shares and run the update again: it corrects itself, because each
+update compares the market value with the depot's balance and only books the difference.
+
+### Products without a Yahoo price
+
+Some funds (often at the Sparkasse) are not on Yahoo Finance. Open the product with the pencil and
+fill in **Price today**. The next update uses the latest price you entered.
+
+### What the page shows
+
+- **Overview:** every investment account with its balance, share of the total and 30-day change.
+- **One table per depot:** shares, latest price, value, amount paid, gain or loss, change since the
+  previous price and since 30 days ago, with totals.
+- **Value per product:** a chart per depot, for the date range at the top of the page.
+- The balance chart and the two allocation pie charts from before.
+
+## Automatic price update (every 3 days)
+
+The update is one command inside the Firefly III container:
+
+```bash
+docker compose exec -T app php artisan firefly-iii:investments-update
+```
+
+(`app` is the name of the Firefly III service in your `docker-compose.yml`; use yours.) Run it once
+by hand to see the result. To run it every 3 days at 07:15, open the crontab of the user that runs
+Docker on your server with `crontab -e` and add this line (use the folder of your
+`docker-compose.yml`):
 
 ```
-investment: true
-broker: Trade Republic
-isin: IE00B4L5Y983
-shares: 12.5
+15 7 */3 * * cd /path/to/your/firefly && docker compose exec -T app php artisan firefly-iii:investments-update >> /var/log/firefly-investments.log 2>&1
 ```
 
-Only `investment: true` is required. Upper/lower case, extra spaces, `=` instead of `:`, Markdown
-list markers (`- `) and bold (`**investment**: true`) are all fine. `yes`, `y`, `1` and `on` work as
-well as `true`. Shares can be written as `12.5`, `12,5`, `1,234.5` or `1.234,5` (a single `,` or `.`
-is always read as the decimal separator). Other text in the notes is ignored. Inactive accounts are
-not shown.
+`*/3` means the 1st, 4th, 7th, ... of each month, so roughly every 3 days. Each run adds at most
+one transfer per depot (none when the value did not change). `--no-prices` only books value changes
+without getting new prices.
 
-Then click **Investments** in the menu on the left (under "Financial control").
-The balance chart uses the date range at the top of the page, like other Firefly III pages.
+Yahoo Finance has no official API: the update uses the same addresses as its website, without an
+account or key. If Yahoo changes them, the update reports an error per product and books nothing
+for that depot; enter prices by hand until it is fixed.
 
 ## Build the image on your Ubuntu server
 
@@ -52,7 +119,8 @@ It takes less than a minute. If you see `[investments] All changes applied.` it 
 ## Switch your docker-compose.yml to the new image
 
 **First make a backup of your database** (as you would before any Firefly III update).
-The investments page only reads data, but a backup is always a good idea.
+The custom image adds two tables to the database, and the price update books transfers, so make
+sure you have a backup you can go back to.
 
 Open your `docker-compose.yml` and find the Firefly III app service. Change only the `image:` line:
 
@@ -83,11 +151,15 @@ Your data is in the database and in the volumes, not in the image, so nothing is
    ```yaml
    image: fireflyiii/core:version-6.7.7
    ```
-2. Run `docker compose up -d`.
+2. Run `docker compose up -d`, and remove the cron line.
 
-That's all. The investments page only reads data and does not change the database, so the
-official image works with your data exactly as before. The notes lines (`investment: true` etc.)
-simply stay in your account notes as normal text.
+Firefly III keeps working with your data as before:
+- The transfers that were already booked (including the value changes) stay; they are normal
+  transfers. The depots keep their last market value.
+- The account "Investment value changes" stays. You can delete it; that also deletes its transfers,
+  so the depots go back to the amounts you paid in.
+- The two tables `investment_products` and `investment_prices` stay in the database. The official
+  image does not use them. They come back to life if you switch to the custom image again.
 
 ## Moving to a newer Firefly III version later
 

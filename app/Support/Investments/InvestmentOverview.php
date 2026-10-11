@@ -64,6 +64,14 @@ final class InvestmentOverview
     }
 
     /**
+     * The currency of an account, or the primary currency when the account has none.
+     */
+    public function getAccountCurrency(Account $account): TransactionCurrency
+    {
+        return $this->repository->getAccountCurrency($account) ?? Amount::getPrimaryCurrency();
+    }
+
+    /**
      * Builds the table: balances on $date and $compareDays days earlier, percentages and totals.
      *
      * When all investment accounts use the same currency, everything is shown in that currency.

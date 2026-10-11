@@ -7,4 +7,6 @@
 !resources/views/investments/
 !resources/lang/en_US/investments.php
 !public/v1/js/ff/investments/
+!app/Console/Commands/Investments/
+!database/migrations/2026_10_11_120000_create_investment_tables.php
 !custom/apply-changes.sh

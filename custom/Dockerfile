@@ -19,6 +19,9 @@ COPY --chown=www-data:www-data routes/custom/investments.php       /var/www/html
 COPY --chown=www-data:www-data resources/views/investments/        /var/www/html/resources/views/investments/
 COPY --chown=www-data:www-data resources/lang/en_US/investments.php /var/www/html/resources/lang/en_US/investments.php
 COPY --chown=www-data:www-data public/v1/js/ff/investments/        /var/www/html/public/v1/js/ff/investments/
+COPY --chown=www-data:www-data app/Console/Commands/Investments/   /var/www/html/app/Console/Commands/Investments/
+# The two new tables (products and prices). Firefly III runs migrations automatically when the container starts.
+COPY --chown=www-data:www-data database/migrations/2026_10_11_120000_create_investment_tables.php /var/www/html/database/migrations/
 
 # Make the two one-line edits (route + menu entry) to the files that are in the official image.
 COPY --chown=www-data:www-data custom/apply-changes.sh /tmp/apply-changes.sh
