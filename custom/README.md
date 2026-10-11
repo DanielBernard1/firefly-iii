@@ -155,4 +155,6 @@ docker run --rm --entrypoint sh firefly-iii-custom:6.7.7 -c 'tail -n 2 routes/we
   the image takes all Firefly III code from the official 6.7.7 image and only adds the investments files.
 - Firefly III's `.gitignore` ignores everything in `resources/lang/` (translations are downloaded
   separately). The file `resources/lang/en_US/investments.php` was therefore added with `git add -f`.
-  Do the same if you add a translation, for example `git add -f resources/lang/de_DE/investments.php`.
+  Do the same if you add a translation, for example `git add -f resources/lang/de_DE/investments.php`,
+  and add a matching `COPY` line to `custom/Dockerfile` and a `!resources/lang/de_DE/investments.php`
+  line to `custom/Dockerfile.dockerignore`.
