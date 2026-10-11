@@ -1,0 +1,10 @@
+# Only send the files that custom/Dockerfile needs to Docker (keeps the build small and fast).
+# Docker reads this file automatically because it sits next to custom/Dockerfile.
+*
+!app/Support/Investments/
+!app/Http/Controllers/Investments/
+!routes/custom/investments.php
+!resources/views/investments/
+!resources/lang/en_US/investments.php
+!public/v1/js/ff/investments/
+!custom/apply-changes.sh
