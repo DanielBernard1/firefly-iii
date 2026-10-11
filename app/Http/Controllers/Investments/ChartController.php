@@ -19,6 +19,8 @@ use Carbon\Carbon;
 use FireflyIII\Exceptions\FireflyException;
 use FireflyIII\Generator\Chart\Basic\GeneratorInterface;
 use FireflyIII\Http\Controllers\Controller;
+use FireflyIII\Models\Account;
+use FireflyIII\Support\Http\Api\ExchangeRateConverter;
 use FireflyIII\Support\Http\Controllers\ChartGeneration;
 use FireflyIII\Support\Investments\InvestmentCalculator;
 use FireflyIII\Support\Investments\InvestmentOverview;
@@ -97,6 +99,63 @@ final class ChartController extends Controller
         $labels   = array_map(static fn (string $date): string => Carbon::parse($date)->isoFormat((string) trans('config.month_and_day_js')), $history['labels']);
 
         return response()->json(app(GeneratorInterface::class)->multiSet($sets, $labels));
+    }
+
+    /**
+     * Pie chart: current value per product, over all depots.
+     * When the depots use different currencies, the values are converted to the primary currency.
+     */
+    public function allocationByProduct(): JsonResponse
+    {
+        /** @var User $user */
+        $user      = auth()->user();
+        $today     = today(config('app.timezone'));
+        $overview  = $this->overview()->getOverview($today);
+        $accounts  = array_map(static fn (array $row): Account => $row['account'], $overview['rows']);
+        $depots    = new InvestmentPortfolio($user)->getDepots($accounts, $today);
+        $convert   = null;
+        if ($overview['converted']) {
+            $converter = new ExchangeRateConverter();
+            $converter->setUserGroup($user->userGroup);
+            $primary   = $overview['currency'];
+            $rows      = $overview['rows'];
+            $convert   = static fn (string $value, Account $account): string => $converter->convert($rows[$account->id]['currency'], $primary, $today, $value);
+        }
+
+        return response()->json($this->productPie(InvestmentPortfolio::allocation($depots, $convert), $overview['currency']->symbol));
+    }
+
+    /**
+     * Pie chart: current value per product in one depot.
+     */
+    public function depotAllocation(int $accountId): JsonResponse
+    {
+        /** @var User $user */
+        $user     = auth()->user();
+        $accounts = $this->overview()->getInvestmentAccounts();
+        if (!array_key_exists($accountId, $accounts)) {
+            return response()->json([]);
+        }
+        $account  = $accounts[$accountId]['account'];
+        $depots   = new InvestmentPortfolio($user)->getDepots([$accountId => $account], today(config('app.timezone')));
+
+        return response()->json($this->productPie(InvestmentPortfolio::allocation($depots), $this->overview()->getAccountCurrency($account)->symbol));
+    }
+
+    /**
+     * @param array<string, string> $values
+     */
+    private function productPie(array $values, string $symbol): array
+    {
+        if (0 === count($values)) {
+            return [];
+        }
+        $data = [];
+        foreach ($values as $label => $value) {
+            $data[(string) $label] = ['amount' => $value, 'currency_symbol' => $symbol];
+        }
+
+        return app(GeneratorInterface::class)->multiCurrencyPieChart($data);
     }
 
     private function allocation(string $field, string $emptyLabel): array

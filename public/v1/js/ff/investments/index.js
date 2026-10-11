@@ -24,6 +24,11 @@ $(function () {
     // current allocation, by account and by broker.
     drawAChart(investmentsAllocationAccountUrl, 'investments-allocation-account', 'pie', pieOptions, false);
     drawAChart(investmentsAllocationBrokerUrl, 'investments-allocation-broker', 'pie', $.extend(true, {}, pieOptions), false);
+    // current value per product: over all depots, and per depot (only drawn when there are products).
+    drawAChart(investmentsAllocationProductUrl, 'investments-allocation-product', 'pie', $.extend(true, {}, pieOptions), false);
+    $('canvas.investments-depot-allocation').each(function () {
+        drawAChart($(this).data('url'), this.id, 'pie', $.extend(true, {}, pieOptions), false);
+    });
 
     // value of each product, one chart per depot. Lines connect across the days without a price.
     // each chart gets a fixed height instead of following the width.

@@ -217,10 +217,22 @@ shares: 12.5</pre>
                                 </tfoot>
                             </table>
                             </div>
-                            <div class="p-3">
-                                <h4 class="h6">{{ trans('investments.product_chart', ['start' => $start->isoFormat($monthAndDayFormat), 'end' => $end->isoFormat($monthAndDayFormat)]) }}</h4>
-                                <div>
-                                    <canvas id="investments-products-chart-{{ $depotId }}" class="investments-products-chart" data-url="{{ route('investments.chart.products', [$depotId]) }}"></canvas>
+                            <div class="row p-3">
+                                <div class="col-lg-8 col-md-12">
+                                    <h4 class="h6">{{ trans('investments.product_chart', ['start' => $start->isoFormat($monthAndDayFormat), 'end' => $end->isoFormat($monthAndDayFormat)]) }}</h4>
+                                    <div>
+                                        <canvas id="investments-products-chart-{{ $depotId }}" class="investments-products-chart" data-url="{{ route('investments.chart.products', [$depotId]) }}"></canvas>
+                                    </div>
+                                </div>
+                                <div class="col-lg-4 col-md-12">
+                                    <h4 class="h6">{{ trans('investments.allocation_product') }}</h4>
+                                    <div class="center-chart">
+                                        <canvas id="investments-depot-allocation-{{ $depotId }}" class="medium-chart investments-depot-allocation" data-url="{{ route('investments.chart.products.allocation', [$depotId]) }}" height="250"></canvas>
+                                    </div>
+                                    @php($depotMissing = \FireflyIII\Support\Investments\InvestmentPortfolio::withoutPrice([$depot]))
+                                    @if(count($depotMissing) > 0)
+                                        <small class="text-muted">{{ trans('investments.allocation_product_missing', ['products' => implode(', ', $depotMissing)]) }}</small>
+                                    @endif
                                 </div>
                             </div>
                         </div>
@@ -243,7 +255,7 @@ shares: 12.5</pre>
         </div>
 
         <div class="row">
-            <div class="col-lg-6 col-md-12">
+            <div class="{{ count($depots) > 0 ? 'col-lg-4' : 'col-lg-6' }} col-md-12">
                 <div class="card mb-2">
                     <div class="card-header">
                         <h3 class="card-title">{{ trans('investments.allocation_account') }}</h3>
@@ -256,7 +268,7 @@ shares: 12.5</pre>
                     <div class="card-footer"><small class="text-muted">{{ trans('investments.allocation_note') }}</small></div>
                 </div>
             </div>
-            <div class="col-lg-6 col-md-12">
+            <div class="{{ count($depots) > 0 ? 'col-lg-4' : 'col-lg-6' }} col-md-12">
                 <div class="card mb-2">
                     <div class="card-header">
                         <h3 class="card-title">{{ trans('investments.allocation_broker') }}</h3>
@@ -269,6 +281,29 @@ shares: 12.5</pre>
                     <div class="card-footer"><small class="text-muted">{{ trans('investments.allocation_note') }}</small></div>
                 </div>
             </div>
+            @if(count($depots) > 0)
+                @php($missing = \FireflyIII\Support\Investments\InvestmentPortfolio::withoutPrice($depots))
+                <div class="col-lg-4 col-md-12">
+                    <div class="card mb-2">
+                        <div class="card-header">
+                            <h3 class="card-title">{{ trans('investments.allocation_product') }}</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="center-chart">
+                                <canvas id="investments-allocation-product" class="medium-chart" height="250"></canvas>
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <small class="text-muted">
+                                {{ trans('investments.allocation_product_note') }}
+                                @if(count($missing) > 0)
+                                    {{ trans('investments.allocation_product_missing', ['products' => implode(', ', $missing)]) }}
+                                @endif
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            @endif
         </div>
     @endif
 @endsection
@@ -279,6 +314,7 @@ shares: 12.5</pre>
             var investmentsBalanceChartUrl = '{{ route('investments.chart.balances') }}';
             var investmentsAllocationAccountUrl = '{{ route('investments.chart.allocation.account') }}';
             var investmentsAllocationBrokerUrl = '{{ route('investments.chart.allocation.broker') }}';
+            var investmentsAllocationProductUrl = '{{ route('investments.chart.allocation.product') }}';
         </script>
         <script src="v1/js/lib/Chart.bundle.min.js?v={{ $FF_BUILD_TIME }}" nonce="{{ $JS_NONCE }}"></script>
         <script src="v1/js/ff/charts.defaults.js?v={{ $FF_BUILD_TIME }}" nonce="{{ $JS_NONCE }}"></script>

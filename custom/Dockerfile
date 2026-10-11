@@ -3,12 +3,12 @@
 # It starts from the official image and only adds the files of the investments page.
 # Build it from the root of this repository (see custom/README.md):
 #
-#   docker build -f custom/Dockerfile -t firefly-iii-custom:6.7.7 .
+#   docker build -f custom/Dockerfile -t firefly-iii-custom:6.7.8 .
 #
 # To build on top of another Firefly III version, change FIREFLY_VERSION below or pass
-# --build-arg FIREFLY_VERSION=6.7.8 (see "Moving to a newer Firefly III version" in custom/README.md).
+# --build-arg FIREFLY_VERSION=6.7.9 (see "Moving to a newer Firefly III version" in custom/README.md).
 
-ARG FIREFLY_VERSION=6.7.7
+ARG FIREFLY_VERSION=6.7.8
 FROM fireflyiii/core:version-${FIREFLY_VERSION}
 ARG FIREFLY_VERSION
 

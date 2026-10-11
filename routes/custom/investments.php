@@ -25,7 +25,9 @@ Route::group(
         Route::get('chart/balances', ['uses' => 'ChartController@balances', 'as' => 'chart.balances']);
         Route::get('chart/allocation/account', ['uses' => 'ChartController@allocationByAccount', 'as' => 'chart.allocation.account']);
         Route::get('chart/allocation/broker', ['uses' => 'ChartController@allocationByBroker', 'as' => 'chart.allocation.broker']);
+        Route::get('chart/allocation/product', ['uses' => 'ChartController@allocationByProduct', 'as' => 'chart.allocation.product']);
         Route::get('chart/products/{accountId}', ['uses' => 'ChartController@productValues', 'as' => 'chart.products'])->where('accountId', '[0-9]+');
+        Route::get('chart/products/{accountId}/allocation', ['uses' => 'ChartController@depotAllocation', 'as' => 'chart.products.allocation'])->where('accountId', '[0-9]+');
 
         Route::get('products/create', ['uses' => 'ProductController@create', 'as' => 'products.create']);
         Route::post('products', ['uses' => 'ProductController@store', 'as' => 'products.store']);

@@ -159,30 +159,41 @@ final class InvestmentUpdater
      */
     private function updatePrice(InvestmentProduct $product, Carbon $date): string
     {
+        $currency = ($this->accounts->getAccountCurrency($product->account) ?? $this->primary)->code;
+        $hasIsin  = null !== $product->isin && '' !== $product->isin;
+        $note     = '';
+        $quote    = null;
         if (null === $product->symbol || '' === $product->symbol) {
-            if (null === $product->isin || '' === $product->isin) {
+            if (!$hasIsin) {
                 return sprintf('%s: no symbol and no ISIN, enter the price yourself.', $product->name);
             }
-            $symbol = $this->source->findSymbol($product->isin);
-            if (null === $symbol) {
-                throw new FireflyException(sprintf('Yahoo Finance does not know ISIN %s. Enter a symbol or the price yourself.', $product->isin));
-            }
-            $product->symbol = $symbol;
+            // the symbol is only saved when its price is in the right currency.
+            $listing         = $this->source->findListing((string) $product->isin, $currency);
+            $product->symbol = $listing['symbol'];
             $product->save();
+            $quote           = $listing['quote'];
         }
-        $quote    = $this->source->getPrice((string) $product->symbol);
-        $currency = $this->accounts->getAccountCurrency($product->account) ?? $this->primary;
-        if ($quote['currency'] !== $currency->code) {
-            throw new FireflyException(sprintf(
-                'The price of %s is in %s, but the depot is in %s. Use a symbol from a German exchange (for example ending in .DE).',
-                $product->symbol,
-                $quote['currency'],
-                $currency->code
-            ));
+        $quote ??= $this->source->getPrice((string) $product->symbol);
+        if ($quote['currency'] !== $currency) {
+            if (!$hasIsin) {
+                throw new FireflyException(sprintf(
+                    'The price of %s is in %s, but the depot is in %s. Enter a symbol from a German exchange (for example ending in .DE for XETRA).',
+                    $product->symbol,
+                    $quote['currency'],
+                    $currency
+                ));
+            }
+            // a symbol in the wrong currency is of no use: look for a better listing of the same ISIN.
+            $old             = (string) $product->symbol;
+            $listing         = $this->source->findListing((string) $product->isin, $currency);
+            $product->symbol = $listing['symbol'];
+            $product->save();
+            $quote           = $listing['quote'];
+            $note            = sprintf(' (symbol changed from %s, which is quoted in a different currency)', $old);
         }
         $this->storePrice($product, $quote['price'], $date, 'yahoo');
 
-        return sprintf('%s (%s): %s %s', $product->name, $product->symbol, $quote['price'], $quote['currency']);
+        return sprintf('%s (%s): %s %s%s', $product->name, $product->symbol, $quote['price'], $quote['currency'], $note);
     }
 
     private function storePrice(InvestmentProduct $product, string $price, Carbon $date, string $source): InvestmentPrice

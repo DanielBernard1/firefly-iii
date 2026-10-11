@@ -1,7 +1,7 @@
 # Custom Firefly III image with an "Investments" page
 
 This folder contains everything needed to run **your own Firefly III image**: the official
-image (`fireflyiii/core:version-6.7.7`) plus the files of the "Investments" page.
+image (`fireflyiii/core:version-6.7.8`) plus the files of the "Investments" page.
 
 - `Dockerfile` – the recipe for the image. It starts from the official image and copies only the new files.
 - `Dockerfile.dockerignore` – tells Docker which files of this repository it needs (only the new ones).
@@ -42,7 +42,7 @@ Example with a Scalable depot, the Scalable cash balance and a Sparkasse depot:
    Scalable Balance → Scalable Depot.
 3. On the **Investments** page, click **Add product** for every product in a depot: name, ISIN,
    number of shares and the amount you paid for them. The Yahoo Finance symbol is optional: when
-   it is empty, it is looked up from the ISIN (German exchanges first, so prices are in euro).
+   it is empty, it is looked up from the ISIN (see "How the symbol is found" below).
 4. Click **Update prices now**. Each depot's balance then becomes its market value.
 5. Set up the automatic update (below).
 
@@ -57,6 +57,29 @@ If you forget step 2, the next update books the difference as a value change (fo
 of €100 as a €100 loss). Fix the shares and run the update again: it corrects itself, because each
 update compares the market value with the depot's balance and only books the difference.
 
+### How the symbol is found
+
+The same fund is listed on many exchanges, in different currencies (for example IE00B4L5Y983 is
+EUNL.DE on XETRA in euro, but IWDA.L in London in US dollars). The lookup:
+
+1. Searches Yahoo for the ISIN and keeps only listings on euro exchanges, in this order:
+   XETRA (`.DE`), Frankfurt (`.F`), the other German exchanges, Amsterdam (`.AS`), Paris (`.PA`),
+   Milan (`.MI`). London, Swiss and US listings are skipped.
+2. If Yahoo's ISIN search only returns non-euro listings (which happens), it searches again by the
+   fund's name and keeps only results with exactly the same name.
+3. Checks the best candidates one by one and takes the first whose price really is in euro.
+4. If there is none, the update says so for that product. Enter a symbol yourself on the product
+   (for example `EUNL.DE`), or enter the price by hand.
+
+A product that already has a symbol in the wrong currency (for example `IWDA.L`) is fixed by the
+next update: it looks up a euro listing for the ISIN and saves that symbol instead.
+
+To see which symbol an ISIN gets, without saving anything:
+
+```bash
+docker compose exec -T app php artisan firefly-iii:investments-update --lookup=IE00B4L5Y983
+```
+
 ### Products without a Yahoo price
 
 Some funds (often at the Sparkasse) are not on Yahoo Finance. Open the product with the pencil and
@@ -67,8 +90,11 @@ fill in **Price today**. The next update uses the latest price you entered.
 - **Overview:** every investment account with its balance, share of the total and 30-day change.
 - **One table per depot:** shares, latest price, value, amount paid, gain or loss, change since the
   previous price and since 30 days ago, with totals.
-- **Value per product:** a chart per depot, for the date range at the top of the page.
-- The balance chart and the two allocation pie charts from before.
+- **Value per product:** a chart per depot, for the date range at the top of the page, and next to
+  it a pie chart with the share of each product in that depot.
+- The balance chart and three allocation pie charts: by account, by broker and **by product** (all
+  depots together). Products without a price are left out of the product charts; a note below the
+  chart names them.
 
 ## Automatic price update (every 3 days)
 
@@ -109,11 +135,11 @@ git checkout main            # or the branch you merged the changes into
 #   cd ~/firefly-iii-custom && git pull
 
 # 2. Build the image. Run this in the root of the repository (note the "." at the end).
-docker build -f custom/Dockerfile -t firefly-iii-custom:6.7.7 .
+docker build -f custom/Dockerfile -t firefly-iii-custom:6.7.8 .
 ```
 
-This downloads the official image `fireflyiii/core:version-6.7.7` once, adds the investments files,
-and saves the result on your server as `firefly-iii-custom:6.7.7`. Nothing is uploaded anywhere.
+This downloads the official image `fireflyiii/core:version-6.7.8` once, adds the investments files,
+and saves the result on your server as `firefly-iii-custom:6.7.8`. Nothing is uploaded anywhere.
 It takes less than a minute. If you see `[investments] All changes applied.` it worked.
 
 ## Switch your docker-compose.yml to the new image
@@ -127,8 +153,8 @@ Open your `docker-compose.yml` and find the Firefly III app service. Change only
 ```yaml
 services:
   app:
-    # image: fireflyiii/core:version-6.7.7     # <- the official image (keep this line as a comment)
-    image: firefly-iii-custom:6.7.7             # <- your own image
+    # image: fireflyiii/core:version-6.7.8     # <- the official image (keep this line as a comment)
+    image: firefly-iii-custom:6.7.8             # <- your own image
     # ... everything else stays exactly the same (volumes, env_file, ports, etc.)
 ```
 
@@ -149,7 +175,7 @@ Your data is in the database and in the volumes, not in the image, so nothing is
 
 1. In `docker-compose.yml`, put the official image back:
    ```yaml
-   image: fireflyiii/core:version-6.7.7
+   image: fireflyiii/core:version-6.7.8
    ```
 2. Run `docker compose up -d`, and remove the cron line.
 
@@ -169,16 +195,16 @@ So in most cases upgrading is just building again with a newer base image:
 
 1. Read the Firefly III release notes for the new version (and back up your database).
 2. Check the exact tag exists on Docker Hub: <https://hub.docker.com/r/fireflyiii/core/tags>
-   (tags look like `version-6.7.8`).
+   (tags look like `version-6.7.9`).
 3. Build with the new version:
    ```bash
    cd ~/firefly-iii-custom
-   docker build -f custom/Dockerfile --build-arg FIREFLY_VERSION=6.7.8 -t firefly-iii-custom:6.7.8 .
+   docker build -f custom/Dockerfile --build-arg FIREFLY_VERSION=6.7.9 -t firefly-iii-custom:6.7.9 .
    ```
-   (Or change `ARG FIREFLY_VERSION=6.7.7` in `custom/Dockerfile` so you don't need `--build-arg`.)
-4. Change `image:` in `docker-compose.yml` to `firefly-iii-custom:6.7.8` and run `docker compose up -d`.
+   (Or change `ARG FIREFLY_VERSION=6.7.8` in `custom/Dockerfile` so you don't need `--build-arg`.)
+4. Change `image:` in `docker-compose.yml` to `firefly-iii-custom:6.7.9` and run `docker compose up -d`.
 5. Open the Investments page and check that it works. If something is wrong, go back to the previous
-   image tag (`firefly-iii-custom:6.7.7` is still on your server) and run `docker compose up -d`.
+   image tag (`firefly-iii-custom:6.7.8` is still on your server) and run `docker compose up -d`.
    Note: going back to an older version is only safe if the newer version did not upgrade your
    database. Firefly III usually does this on start, which is why step 1 says: make a backup.
 
@@ -200,7 +226,7 @@ the official image. To merge:
 ```bash
 git remote add upstream https://github.com/firefly-iii/firefly-iii.git   # only once
 git fetch upstream --tags
-git merge v6.7.8          # the release tag you want
+git merge v6.7.9          # the release tag you want
 ```
 
 Because almost all custom code is in new files, conflicts are unlikely. Only two existing files
@@ -215,16 +241,18 @@ single line again.
 ## Check what is in your image
 
 ```bash
-docker run --rm --entrypoint sh firefly-iii-custom:6.7.7 -c 'tail -n 2 routes/web.php; grep -n investments resources/views/components/layout/sidebar.blade.php'
+docker run --rm --entrypoint sh firefly-iii-custom:6.7.8 -c 'tail -n 2 routes/web.php; grep -n investments resources/views/components/layout/sidebar.blade.php'
 ```
 
 ## Notes
 
-- The official image tag `version-6.7.7` was checked on Docker Hub on 2026-10-11. Its digest was
-  `sha256:2f5e2595bc1ac06276032d6fc89febb4ecfd3f73fa0630e7a97693bb98bde431`; you can see the digest
-  of the image on your server with `docker image inspect fireflyiii/core:version-6.7.7 --format '{{json .RepoDigests}}'`.
-- This repository's own source code is at Firefly III 6.7.8. That does not matter for the image:
-  the image takes all Firefly III code from the official 6.7.7 image and only adds the investments files.
+- The default base image is `fireflyiii/core:version-6.7.8`, the same version as this repository's
+  source code. Its digest on 2026-10-11 was
+  `sha256:db249101cac3047b5973946284ad594c698945b8253f0581c5edaccf6b7903d5`; you can see the digest
+  of the image on your server with `docker image inspect fireflyiii/core:version-6.7.8 --format '{{json .RepoDigests}}'`.
+- The image takes all Firefly III code from the official image and only adds the investments files.
+  It can still be built on 6.7.7 with `--build-arg FIREFLY_VERSION=6.7.7`; the two files that
+  `apply-changes.sh` edits are the same in 6.7.7 and 6.7.8.
 - Firefly III's `.gitignore` ignores everything in `resources/lang/` (translations are downloaded
   separately). The file `resources/lang/en_US/investments.php` was therefore added with `git add -f`.
   Do the same if you add a translation, for example `git add -f resources/lang/de_DE/investments.php`,

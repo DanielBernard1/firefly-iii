@@ -103,6 +103,67 @@ final class InvestmentPortfolio
     }
 
     /**
+     * Value per product, for the "allocation by product" pie charts. Largest first.
+     * Products without a price, or with a value of zero or less, are left out (a pie cannot show them).
+     * A product name that is used in more than one depot gets the depot name added, so the slices stay apart.
+     *
+     * @param array<int, array{account: Account, products: array<int, array<string, mixed>>, total: array<string, null|string>}> $depots
+     * @param null|callable(string, Account): string                                                                              $convert optional: converts a value from the depot's currency
+     *
+     * @return array<string, string> label => value
+     */
+    public static function allocation(array $depots, ?callable $convert = null): array
+    {
+        $items = [];
+        $names = [];
+        foreach ($depots as $depot) {
+            foreach ($depot['products'] as $row) {
+                if (null === $row['value'] || 1 !== bccomp((string) $row['value'], '0', 12)) {
+                    continue;
+                }
+                $name          = $row['product']->name;
+                $names[$name]  = ($names[$name] ?? 0) + 1;
+                $value         = null === $convert ? (string) $row['value'] : $convert((string) $row['value'], $depot['account']);
+                $items[]       = ['name' => $name, 'depot' => $depot['account']->name, 'value' => $value];
+            }
+        }
+        usort($items, static fn (array $a, array $b): int => bccomp($b['value'], $a['value'], 12));
+        $result = [];
+        foreach ($items as $item) {
+            $label = $names[$item['name']] > 1 ? sprintf('%s (%s)', $item['name'], $item['depot']) : $item['name'];
+            $base  = $label;
+            $count = 2;
+            while (array_key_exists($label, $result)) {
+                $label = sprintf('%s %d', $base, $count++);
+            }
+            $result[$label] = $item['value'];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Names of the products that have no price yet (they are missing from the allocation charts).
+     *
+     * @param array<int, array{account: Account, products: array<int, array<string, mixed>>, total: array<string, null|string>}> $depots
+     *
+     * @return array<int, string>
+     */
+    public static function withoutPrice(array $depots): array
+    {
+        $names = [];
+        foreach ($depots as $depot) {
+            foreach ($depot['products'] as $row) {
+                if (null === $row['value']) {
+                    $names[] = $row['product']->name;
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $rows
      *
      * @return array<string, null|string>
@@ -110,19 +171,23 @@ final class InvestmentPortfolio
     public static function total(array $rows): array
     {
         $total = ['value' => '0', 'invested' => '0', 'gain' => '0', 'change' => '0', 'change_30' => '0', 'previous_value' => '0', 'value_30' => '0'];
+        // the amount paid of the products that have a price: the gain in % is based on these only.
+        $investedWithPrice = '0';
         foreach ($rows as $row) {
+            // amount paid counts for every product, also when it has no price yet.
+            $total['invested'] = bcadd($total['invested'], $row['invested'], 12);
             if (null === $row['value']) {
                 continue;
             }
+            $investedWithPrice       = bcadd($investedWithPrice, $row['invested'], 12);
             $total['value']          = bcadd($total['value'], $row['value'], 12);
-            $total['invested']       = bcadd($total['invested'], $row['invested'], 12);
             $total['gain']           = bcadd($total['gain'], $row['gain'], 12);
             $total['change']         = bcadd($total['change'], $row['change'] ?? '0', 12);
             $total['change_30']      = bcadd($total['change_30'], $row['change_30'] ?? '0', 12);
             $total['previous_value'] = bcsub($total['value'], $total['change'], 12);
             $total['value_30']       = bcsub($total['value'], $total['change_30'], 12);
         }
-        $total['gain_pct']      = InvestmentCalculator::percentage($total['gain'], $total['invested'], true);
+        $total['gain_pct']      = InvestmentCalculator::percentage($total['gain'], $investedWithPrice, true);
         $total['change_pct']    = InvestmentCalculator::percentage($total['change'], $total['previous_value'], true);
         $total['change_30_pct'] = InvestmentCalculator::percentage($total['change_30'], $total['value_30'], true);
 
