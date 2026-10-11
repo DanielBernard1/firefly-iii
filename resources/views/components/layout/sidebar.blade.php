@@ -59,6 +59,7 @@
             </p>
         </a>
     </li>
+    @include('investments.menu-item')
     <li class="nav-header text-uppercase">{{ __('firefly.accounting') }}</li>
 
     <li class="nav-item {{ menu_open_partial('transactions.') }}">

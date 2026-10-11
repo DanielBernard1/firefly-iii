@@ -1474,3 +1474,6 @@ Route::group(
         //        Route::post('set-order/{bill}', ['uses' => 'Bill\IndexController@setOrder', 'as' => 'set-order']);
     }
 );
+
+// Custom addition: "Investments" page (all its routes are in this file).
+require __DIR__.'/custom/investments.php';
